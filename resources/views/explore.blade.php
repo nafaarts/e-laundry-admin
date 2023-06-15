@@ -138,7 +138,7 @@
 
             L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
 
-            await putLaundry()
+            await putLaundry(coords)
 
             you = L.marker(new L.LatLng(coords.lat, coords.long), {
                     icon: currentPosition,
@@ -192,20 +192,27 @@
             }
         }
 
-        async function getNearestLaundry(bounds) {
+        async function getNearestLaundry(bounds, coords) {
             let {
                 swLat,
                 swLng,
                 neLat,
                 neLng
             } = bounds
+            let {
+                lat,
+                long
+            } = coords
             let request = await fetch(
-                `/api/get-nearest-area?swLat=${swLat}&swLng=${swLng}&neLat=${neLat}&neLng=${neLng}`)
+                `/api/get-nearest-area?swLat=${swLat}&swLng=${swLng}&neLat=${neLat}&neLng=${neLng}&lat=${lat}&lng=${long}`
+            )
             let result = await request.json()
+
+            console.log(result.terdekat)
             return result
         }
 
-        async function putLaundry() {
+        async function putLaundry(coords) {
             let bounds = {
                 swLat: map.getBounds()._southWest.lat,
                 swLng: map.getBounds()._southWest.lng,
@@ -217,8 +224,8 @@
                 iconUrl: "{{ asset('icon_laundry.svg') }}"
             });
 
-            let laundries = await getNearestLaundry(bounds);
-            laundries.forEach(function(item) {
+            let laundries = await getNearestLaundry(bounds, coords);
+            laundries.data.forEach(function(item) {
                 let id = item.id
                 if (!markers[id]) {
                     let marker = new L.marker(new L.LatLng(item.lat, item.long), {

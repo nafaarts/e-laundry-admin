@@ -29,11 +29,50 @@ Route::get('/get-nearest-area', function () {
     $neLat = request('neLat') or abort(404);
     $neLng = request('neLng') or abort(404);
 
+    $lat = request('lat');
+    $lng = request('lng');
+
+    $terdekat = [];
+
+    if ($lat && $lng) {
+        // cari laundry terdekat menggunakan rumus algoritma dijkstra.
+        $laundry = Laundry::all();
+
+        // // Tambahkan simpul-simpul toko laundry ke graf dan jaraknya dari posisi Anda
+        $graph = [];
+        foreach ($laundry as $key => $item) {
+            $distance = (float) number_format(6371 *
+                acos(
+                    cos(deg2rad($lat))
+                        * cos(deg2rad($item->lat))
+                        * cos(deg2rad($item->long) - deg2rad($lng))
+                        + sin(deg2rad($lat))
+                        * sin(deg2rad($item->lat))
+                ), 2);;
+            // $graph[] = $distance;
+
+            $graph[$key]['id'] = $item->id;
+            $graph[$key]['name'] = $item->name;
+            $graph[$key]['distance'] = $distance;
+        }
+
+        // // Urutkan graf berdasarkan jarak terdekat
+        usort($graph, function ($a, $b) {
+            return (int) $a['distance'] - (int) $b['distance'];
+        });
+
+        // ambil 3 data terdekat.
+        $terdekat = array_slice($graph, 0, 3);
+    }
+
     $laundry = Laundry::whereBetween('lat', [$swLat, $neLat])
         ->whereBetween('long', [$swLng, $neLng])
         ->get();
 
-    return $laundry;
+    return [
+        "data" => $laundry,
+        "terdekat" => $terdekat
+    ];
 });
 
 Route::get('/notification/{id}', function ($id) {
@@ -49,6 +88,7 @@ Route::get('/laundry/{id}', function ($id) {
     $lng = request('lng');
 
     if ($lat && $lng) {
+        // hitung jarak toko laundry dari posisi user.
         $laundry->distance = (float) number_format(6371 *
             acos(
                 cos(deg2rad($lat))
@@ -101,6 +141,7 @@ Route::get('/laundry', function () {
     });
 
     $laundry = collect($laundry)->where('cheapest_price', '!=', 0);
+
     $filter = request('filter');
     switch ($filter) {
         case 'cheapest':
@@ -116,6 +157,7 @@ Route::get('/laundry', function () {
             $result = $laundry->sortBy('distance')->values()->all();
             break;
     }
+
     $pagination = new PaginationHelper(request());
     return $pagination->paginate(collect($result), 10)->withQueryString();
 });
